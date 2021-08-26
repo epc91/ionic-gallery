@@ -4,12 +4,14 @@ import { Injectable } from '@angular/core';
 import { Camera, CameraPhoto, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Storage } from '@capacitor/storage';
+import { Direct } from 'protractor/built/driverProviders';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PhotoService {
   public photos: Photo[] = [];
+  private PHOTO_STORAGE: string = "photos";
 
   constructor() { }
 
@@ -26,6 +28,10 @@ export class PhotoService {
     const savedImageFile = await this.savePicture(capturedPhoto);
 
     this.photos.unshift(savedImageFile);
+    Storage.set({
+      key: this.PHOTO_STORAGE,
+      value: JSON.stringify(this.photos)
+    });
   };
   private async savePicture(cameraPhoto: CameraPhoto){
     const base64Data = await this.readAsBase64(cameraPhoto);
@@ -54,7 +60,19 @@ export class PhotoService {
       resolve(reader.result);
     };
     reader.readAsDataURL(blob);
-  })
+  });
+  public async loadSaved() {
+    const photoList = await Storage.get({ key: this.PHOTO_STORAGE })
+    this.photos = JSON.parse(photoList.value) || [];
+
+    for (let photo of this.photos){
+      const readFile = await Filesystem.readFile({
+        path: photo.filepath,
+        directory: Directory.Data
+      });
+      photo.webviewPath = `data:image/jpeg;base64,${readFile.data}`;
+    }
+  }
 };
 
 export interface Photo {
